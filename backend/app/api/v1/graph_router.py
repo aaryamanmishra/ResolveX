@@ -85,7 +85,12 @@ def evaluate_case_fraud_rules(
     request: Request,
     depth: int = Query(default=2, ge=1, le=4),
     ctx: TenantContext = Depends(
-        require_roles(UserRole.FRAUD_ANALYST, UserRole.SUPERVISOR, UserRole.PLATFORM_ADMIN)
+        require_roles(
+            UserRole.SUPPORT_ANALYST,
+            UserRole.FRAUD_ANALYST,
+            UserRole.SUPERVISOR,
+            UserRole.PLATFORM_ADMIN,
+        )
     ),
 ) -> FraudEvaluationResponse:
     """Run deterministic fraud rules over a case graph neighborhood."""

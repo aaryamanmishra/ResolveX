@@ -130,6 +130,38 @@ async def upload_evidence_file(
         ) from err
 
 
+@router.get("/case/{case_id}", response_model=list[EvidenceDetailResponse])
+def list_case_evidence(
+    case_id: str,
+    ctx: TenantContext = Depends(get_current_tenant_context),
+) -> list[EvidenceDetailResponse]:
+    """List all evidence assets and their extracted claims attached to a case."""
+    try:
+        assets = evidence_service.list_evidence_for_case(ctx, case_id)
+        results = []
+        for asset in assets:
+            _, download_url = evidence_service.get_evidence_asset(ctx, asset.id)
+            claims = evidence_service.list_claims_for_asset(ctx, asset.id)
+            results.append(
+                EvidenceDetailResponse(
+                    asset=asset,
+                    download_url=download_url,
+                    claims=claims,
+                )
+            )
+        return results
+    except SecurityError as sec_err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(sec_err),
+        ) from sec_err
+    except KeyError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+
+
 @router.get("/{evidence_id}", response_model=EvidenceDetailResponse)
 def get_evidence_detail(
     evidence_id: str,

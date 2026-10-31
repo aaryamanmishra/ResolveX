@@ -204,6 +204,14 @@ class ReconciliationEngine:
 
         return case
 
+    def record_discrepancy(
+        self,
+        discrepancy: ReconciliationDiscrepancy,
+        correlation_id: str | None = None,
+    ) -> Case:
+        """Manually or externally record a reconciliation discrepancy and create a case."""
+        return self._record_discrepancy(discrepancy, correlation_id)
+
     def list_exceptions(self, tenant_id: str) -> list[ReconciliationDiscrepancy]:
         """List active reconciliation exceptions for a tenant."""
         return [ex for ex in self._exceptions if ex.tenant_id == tenant_id]

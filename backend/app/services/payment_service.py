@@ -9,11 +9,12 @@ PRD §6 (FR-004 to FR-008) & §15.1:
 """
 
 import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from backend.app.domain.enums import FundsStatus, PaymentStatus, RefundStatus
+from backend.app.domain.enums import FraudSeverity, FundsStatus, PaymentStatus, RefundStatus
 from backend.app.domain.payment import (
     CreatePaymentRequest,
     Payment,
@@ -28,7 +29,10 @@ from backend.app.providers.payment_provider import (
 from backend.app.providers.razorpay_provider import RazorpayPaymentProvider
 from backend.app.security.context import SecurityError, TenantContext
 from backend.app.services.audit_service import audit_service
-from backend.app.services.reconciliation_service import reconciliation_engine
+from backend.app.services.reconciliation_service import (
+    ReconciliationDiscrepancy,
+    reconciliation_engine,
+)
 
 TERMINAL_PAYMENT_STATUSES = {
     PaymentStatus.SUCCEEDED,
@@ -462,6 +466,196 @@ class PaymentService:
         if key not in self._refunds:
             raise KeyError(f"Refund '{refund_id}' not found in tenant '{ctx.tenant_id}'")
         return self._refunds[key]
+
+    def simulate_scenario(
+        self,
+        ctx: TenantContext,
+        scenario: str,
+        amount_minor: int = 50000,
+        currency: str = "INR",
+        merchant_id: str = "merch_apex_01",
+        correlation_id: str | None = None,
+    ) -> tuple[Payment, PaymentEvent | None]:
+        """Simulate a deterministic payment scenario and return payment with event."""
+        order_ref = f"ORD-SIM-{uuid.uuid4().hex[:8].upper()}"
+        payment_req = CreatePaymentRequest(
+            tenant_id=ctx.tenant_id,
+            merchant_id=merchant_id,
+            order_ref=order_ref,
+            amount_minor=amount_minor,
+            currency=currency,
+            customer_token=f"cust_tok_{ctx.user_id}",
+        )
+        payment = self.create_payment(ctx, payment_req, correlation_id=correlation_id)
+
+        sim_adapter = SimulatorPaymentProvider()
+        event: PaymentEvent | None = None
+
+        if scenario in ("scenario_1_success", "success"):
+            raw_body = json.dumps(
+                {
+                    "event_id": f"evt_sim_{uuid.uuid4().hex[:8]}",
+                    "event_type": "payment.captured",
+                    "payment_id": payment.provider_payment_id,
+                    "order_ref": payment.order_ref,
+                    "amount_minor": amount_minor,
+                    "currency": currency,
+                    "status": "captured",
+                    "tenant_id": ctx.tenant_id,
+                }
+            ).encode("utf-8")
+            sig = sim_adapter.generate_signature(raw_body)
+            self.ingest_webhook(
+                provider_name="simulator",
+                raw_body=raw_body,
+                headers={"X-Simulator-Signature": sig},
+                tenant_id=ctx.tenant_id,
+                correlation_id=correlation_id,
+            )
+            payment = self.get_payment(ctx, payment.id)
+            timeline = self.get_timeline(ctx, payment.id)
+            event = timeline[-1] if timeline else None
+
+        elif scenario in ("scenario_2_pending", "pending"):
+            pass
+
+        elif scenario in ("scenario_3_failed", "failed"):
+            raw_body = json.dumps(
+                {
+                    "event_id": f"evt_sim_{uuid.uuid4().hex[:8]}",
+                    "event_type": "payment.failed",
+                    "payment_id": payment.provider_payment_id,
+                    "order_ref": payment.order_ref,
+                    "amount_minor": amount_minor,
+                    "currency": currency,
+                    "status": "failed",
+                    "tenant_id": ctx.tenant_id,
+                }
+            ).encode("utf-8")
+            sig = sim_adapter.generate_signature(raw_body)
+            self.ingest_webhook(
+                provider_name="simulator",
+                raw_body=raw_body,
+                headers={"X-Simulator-Signature": sig},
+                tenant_id=ctx.tenant_id,
+                correlation_id=correlation_id,
+            )
+            payment = self.get_payment(ctx, payment.id)
+            timeline = self.get_timeline(ctx, payment.id)
+            event = timeline[-1] if timeline else None
+
+        elif scenario in (
+            "scenario_4_debit_mismatch",
+            "scenario_4_customer_reported_debit",
+            "debit_mismatch",
+        ):
+            raw_body = json.dumps(
+                {
+                    "event_id": f"evt_sim_{uuid.uuid4().hex[:8]}",
+                    "event_type": "payment.failed",
+                    "payment_id": payment.provider_payment_id,
+                    "order_ref": payment.order_ref,
+                    "amount_minor": amount_minor,
+                    "currency": currency,
+                    "status": "failed",
+                    "tenant_id": ctx.tenant_id,
+                }
+            ).encode("utf-8")
+            sig = sim_adapter.generate_signature(raw_body)
+            self.ingest_webhook(
+                provider_name="simulator",
+                raw_body=raw_body,
+                headers={"X-Simulator-Signature": sig},
+                tenant_id=ctx.tenant_id,
+                correlation_id=correlation_id,
+            )
+            payment = self.report_customer_debit(ctx, payment.id, correlation_id=correlation_id)
+            discrepancy = ReconciliationDiscrepancy(
+                discrepancy_code="UNCONFIRMED_CUSTOMER_DEBIT",
+                payment_id=payment.id,
+                tenant_id=ctx.tenant_id,
+                description=f"Customer reported debit on payment {payment.id} while gateway status is {payment.payment_status.value}.",
+                severity=FraudSeverity.MEDIUM,
+                evidence_ids=(payment.id,),
+                details={
+                    "order_ref": payment.order_ref,
+                    "provider_status": payment.payment_status.value,
+                    "funds_status": payment.funds_status.value,
+                    "amount_minor": payment.amount_minor,
+                },
+            )
+            reconciliation_engine.record_discrepancy(discrepancy, correlation_id=correlation_id)
+            timeline = self.get_timeline(ctx, payment.id)
+            event = timeline[-1] if timeline else None
+
+        elif scenario in ("scenario_6_out_of_order", "out_of_order"):
+            raw1 = json.dumps(
+                {
+                    "event_id": f"evt_sim_cap_{uuid.uuid4().hex[:6]}",
+                    "event_type": "payment.captured",
+                    "payment_id": payment.provider_payment_id,
+                    "order_ref": payment.order_ref,
+                    "amount_minor": amount_minor,
+                    "currency": currency,
+                    "status": "captured",
+                    "tenant_id": ctx.tenant_id,
+                }
+            ).encode("utf-8")
+            self.ingest_webhook(
+                "simulator",
+                raw1,
+                {"X-Simulator-Signature": sim_adapter.generate_signature(raw1)},
+                tenant_id=ctx.tenant_id,
+            )
+            raw2 = json.dumps(
+                {
+                    "event_id": f"evt_sim_auth_{uuid.uuid4().hex[:6]}",
+                    "event_type": "payment.authorized",
+                    "payment_id": payment.provider_payment_id,
+                    "order_ref": payment.order_ref,
+                    "amount_minor": amount_minor,
+                    "currency": currency,
+                    "status": "authorized",
+                    "tenant_id": ctx.tenant_id,
+                }
+            ).encode("utf-8")
+            self.ingest_webhook(
+                "simulator",
+                raw2,
+                {"X-Simulator-Signature": sim_adapter.generate_signature(raw2)},
+                tenant_id=ctx.tenant_id,
+            )
+            payment = self.get_payment(ctx, payment.id)
+            timeline = self.get_timeline(ctx, payment.id)
+            event = timeline[-1] if timeline else None
+
+        elif scenario in ("scenario_8_amount_mismatch", "amount_mismatch"):
+            mismatch_amount = int(amount_minor * 0.9)
+            raw_body = json.dumps(
+                {
+                    "event_id": f"evt_sim_{uuid.uuid4().hex[:8]}",
+                    "event_type": "payment.captured",
+                    "payment_id": payment.provider_payment_id,
+                    "order_ref": payment.order_ref,
+                    "amount_minor": mismatch_amount,
+                    "currency": currency,
+                    "status": "captured",
+                    "tenant_id": ctx.tenant_id,
+                }
+            ).encode("utf-8")
+            self.ingest_webhook(
+                provider_name="simulator",
+                raw_body=raw_body,
+                headers={"X-Simulator-Signature": sim_adapter.generate_signature(raw_body)},
+                tenant_id=ctx.tenant_id,
+                expected_amount_minor=amount_minor,
+                correlation_id=correlation_id,
+            )
+            payment = self.get_payment(ctx, payment.id)
+            timeline = self.get_timeline(ctx, payment.id)
+            event = timeline[-1] if timeline else None
+
+        return payment, event
 
     def clear(self) -> None:
         """Reset for tests."""

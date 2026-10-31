@@ -92,6 +92,7 @@ export class ResolveXApiClient {
 
   public setPersona(role: UserRole) {
     this.currentRole = role;
+    this.token = ''; // Clear cached token to re-authenticate as new persona
     if (role === 'PLATFORM_ADMIN') {
       this.currentUserId = 'usr_admin_01';
     } else if (role === 'SUPERVISOR') {
@@ -191,7 +192,10 @@ export class ResolveXApiClient {
         merchant_id: 'merch_apex_01',
       }),
     });
-    if (!res.ok) throw new Error('Failed to simulate scenario');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to simulate scenario');
+    }
     return res.json();
   }
 
@@ -234,7 +238,10 @@ export class ResolveXApiClient {
       headers,
       body: JSON.stringify({ track }),
     });
-    if (!res.ok) throw new Error('Investigation failed');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Investigation failed');
+    }
     return res.json();
   }
 
@@ -253,6 +260,13 @@ export class ResolveXApiClient {
       body: JSON.stringify({ decision, reason }),
     });
     if (!res.ok) throw new Error('Failed to record approval decision');
+    return res.json();
+  }
+
+  public async getCaseApprovals(caseId: string): Promise<Approval[]> {
+    const headers = await this.getHeaders();
+    const res = await fetch(`${API_BASE}/cases/${caseId}/approvals`, { headers });
+    if (!res.ok) return [];
     return res.json();
   }
 
@@ -302,6 +316,13 @@ export class ResolveXApiClient {
     const headers = await this.getHeaders();
     const res = await fetch(`${API_BASE}/evidence/${evidenceId}`, { headers });
     if (!res.ok) throw new Error('Failed to fetch evidence detail');
+    return res.json();
+  }
+
+  public async getEvidenceForCase(caseId: string): Promise<Array<{ asset: EvidenceAsset; download_url: string; claims: EvidenceClaim[] }>> {
+    const headers = await this.getHeaders();
+    const res = await fetch(`${API_BASE}/evidence/case/${caseId}`, { headers });
+    if (!res.ok) return [];
     return res.json();
   }
 

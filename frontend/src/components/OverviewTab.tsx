@@ -159,7 +159,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </li>
           </ul>
           <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
-            <span className="text-xs text-slate-400">PRD §15.1 Scenarios Verified</span>
+            <button
+              onClick={onRunTrack1Demo}
+              className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-md shadow-sky-600/20 transition flex items-center space-x-1.5"
+            >
+              <span>▶ Run Track 1 Demo</span>
+            </button>
             <button
               onClick={() => onNavigate('payments')}
               className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center space-x-1"
@@ -196,7 +201,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </li>
           </ul>
           <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
-            <span className="text-xs text-slate-400">PRD §15.2 Scenarios Verified</span>
+            <button
+              onClick={onRunTrack2Demo}
+              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md shadow-rose-600/20 transition flex items-center space-x-1.5"
+            >
+              <span>▶ Run Track 2 Demo</span>
+            </button>
             <button
               onClick={() => onNavigate('graph')}
               className="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center space-x-1"

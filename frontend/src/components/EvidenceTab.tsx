@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { apiClient } from '../api';
 import { Case, EvidenceAsset, EvidenceClaim, VerificationState } from '../types/contracts';
 import {
   UploadCloud,
@@ -42,6 +43,24 @@ export const EvidenceTab: React.FC<EvidenceTabProps> = ({
   const [claims, setClaims] = useState<EvidenceClaim[]>([]);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Auto-fetch existing evidence assets and claims when selected case changes
+  useEffect(() => {
+    if (selectedCaseId) {
+      apiClient.getEvidenceForCase(selectedCaseId).then((evList) => {
+        if (evList && evList.length > 0) {
+          setActiveAsset(evList[0].asset);
+          setClaims(evList[0].claims);
+        } else {
+          setActiveAsset(null);
+          setClaims([]);
+        }
+      }).catch(() => {
+        setActiveAsset(null);
+        setClaims([]);
+      });
+    }
+  }, [selectedCaseId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

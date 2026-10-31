@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
-import { Case, CaseStatus, CaseType, FraudSeverity, StructuredInvestigationResult } from '../types/contracts';
+import React, { useState, useEffect } from 'react';
+import {
+  Approval,
+  Case,
+  CaseStatus,
+  CaseType,
+  FraudSeverity,
+  StructuredInvestigationResult,
+  UserRole,
+} from '../types/contracts';
 import {
   FolderOpen,
   Play,
@@ -17,9 +25,12 @@ import {
 interface InvestigationsTabProps {
   cases: Case[];
   selectedCaseId: string | null;
+  currentRole: UserRole;
+  onSwitchRole?: (role: UserRole) => void;
   onSelectCase: (caseId: string) => void;
   onRunInvestigation: (caseId: string, track: 'payment_issue' | 'fraud_investigation') => Promise<void>;
   onFetchFindings: (caseId: string) => Promise<StructuredInvestigationResult | null>;
+  onFetchApprovals: (caseId: string) => Promise<Approval[]>;
   onApproveAction: (approvalId: string, decision: 'APPROVED' | 'REJECTED', reason: string) => Promise<void>;
   onCreateCase: (type: CaseType, title: string, linkedPaymentIds: string[], priority: FraudSeverity) => Promise<void>;
   onRefresh: () => void;
@@ -28,15 +39,19 @@ interface InvestigationsTabProps {
 export const InvestigationsTab: React.FC<InvestigationsTabProps> = ({
   cases,
   selectedCaseId,
+  currentRole,
+  onSwitchRole,
   onSelectCase,
   onRunInvestigation,
   onFetchFindings,
+  onFetchApprovals,
   onApproveAction,
   onCreateCase,
   onRefresh,
 }) => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [activeFindings, setActiveFindings] = useState<StructuredInvestigationResult | null>(null);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
   const [investigating, setInvestigating] = useState(false);
   const [approvalReason, setApprovalReason] = useState('');
   const [approving, setApproving] = useState(false);
@@ -54,14 +69,32 @@ export const InvestigationsTab: React.FC<InvestigationsTabProps> = ({
     (c) => statusFilter === 'ALL' || c.case_status === statusFilter
   );
 
+  // Auto-fetch findings and approvals when selected case changes
+  useEffect(() => {
+    if (selectedCase) {
+      onFetchFindings(selectedCase.id)
+        .then((f) => setActiveFindings(f))
+        .catch(() => setActiveFindings(null));
+      onFetchApprovals(selectedCase.id)
+        .then((apprs) => setApprovals(apprs))
+        .catch(() => setApprovals([]));
+    }
+  }, [selectedCase?.id]);
+
   const handleSelectCase = async (c: Case) => {
     onSelectCase(c.id);
     setActiveFindings(null);
+    setApprovals([]);
     try {
-      const findings = await onFetchFindings(c.id);
+      const [findings, apprs] = await Promise.all([
+        onFetchFindings(c.id).catch(() => null),
+        onFetchApprovals(c.id).catch(() => []),
+      ]);
       setActiveFindings(findings);
+      setApprovals(apprs);
     } catch {
       setActiveFindings(null);
+      setApprovals([]);
     }
   };
 
@@ -71,8 +104,12 @@ export const InvestigationsTab: React.FC<InvestigationsTabProps> = ({
     try {
       const track = selectedCase.case_type === 'FRAUD_INVESTIGATION' ? 'fraud_investigation' : 'payment_issue';
       await onRunInvestigation(selectedCase.id, track);
-      const findings = await onFetchFindings(selectedCase.id);
+      const [findings, apprs] = await Promise.all([
+        onFetchFindings(selectedCase.id).catch(() => null),
+        onFetchApprovals(selectedCase.id).catch(() => []),
+      ]);
       setActiveFindings(findings);
+      setApprovals(apprs);
       onRefresh();
     } finally {
       setInvestigating(false);
@@ -86,8 +123,12 @@ export const InvestigationsTab: React.FC<InvestigationsTabProps> = ({
       setApprovalReason('');
       onRefresh();
       if (selectedCase) {
-        const findings = await onFetchFindings(selectedCase.id);
+        const [findings, apprs] = await Promise.all([
+          onFetchFindings(selectedCase.id).catch(() => null),
+          onFetchApprovals(selectedCase.id).catch(() => []),
+        ]);
         setActiveFindings(findings);
+        setApprovals(apprs);
       }
     } finally {
       setApproving(false);
@@ -356,36 +397,87 @@ export const InvestigationsTab: React.FC<InvestigationsTabProps> = ({
                       Review the evidence and recorded claims before signing off.
                     </p>
 
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">
-                        Supervisor Review Rationale / Notes
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Verified customer statement and approved refund escalation"
-                        value={approvalReason}
-                        onChange={(e) => setApprovalReason(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500"
-                      />
-                    </div>
+                    {/* Pending Action Summary */}
+                    {(() => {
+                      const pendingApproval = approvals.find((a) => a.decision === 'PENDING') || approvals[0];
+                      const canApprove = currentRole === 'SUPERVISOR' || currentRole === 'PLATFORM_ADMIN';
 
-                    <div className="flex justify-end space-x-2 pt-2">
-                      <button
-                        onClick={() => handleDecision('appr_dummy', 'REJECTED')}
-                        disabled={approving}
-                        className="px-4 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition"
-                      >
-                        Reject Action
-                      </button>
-                      <button
-                        onClick={() => handleDecision('appr_dummy', 'APPROVED')}
-                        disabled={approving}
-                        className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20 transition"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Approve & Finalize Action</span>
-                      </button>
-                    </div>
+                      return (
+                        <>
+                          {pendingApproval && (
+                            <div className="bg-slate-900/90 rounded-lg p-3 border border-slate-800 text-xs space-y-1.5">
+                              <div className="flex items-center justify-between text-slate-400">
+                                <span className="font-mono text-purple-400 font-bold">{pendingApproval.id}</span>
+                                <span className="text-[10px]">Status: <strong className="text-amber-400">{pendingApproval.decision}</strong></span>
+                              </div>
+                              <div className="text-slate-200">
+                                <span className="text-slate-400">Proposed Action: </span>
+                                <span className="font-semibold text-white">{String(pendingApproval.action_draft.action_type || 'ESCALATION')}</span>
+                                {pendingApproval.action_draft.amount_minor !== undefined && (
+                                  <span className="ml-2 font-mono text-emerald-400 font-semibold">
+                                    ₹{((Number(pendingApproval.action_draft.amount_minor)) / 100).toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                              {Boolean(pendingApproval.action_draft.reason) && (
+                                <p className="text-slate-400 text-[11px]">
+                                  Justification: {String(pendingApproval.action_draft.reason)}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {!canApprove && (
+                            <div className="bg-amber-950/40 border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-300 flex items-center justify-between">
+                              <span>
+                                Persona Notice: Current role (<strong>{currentRole}</strong>) is read-only for approvals. Switch to <strong>Supervisor</strong> to sign off.
+                              </span>
+                              {onSwitchRole && (
+                                <button
+                                  type="button"
+                                  onClick={() => onSwitchRole('SUPERVISOR')}
+                                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded text-[11px] transition shrink-0 ml-2 shadow"
+                                >
+                                  Switch to Supervisor
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">
+                              Supervisor Review Rationale / Notes
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Verified customer statement and approved refund escalation"
+                              value={approvalReason}
+                              onChange={(e) => setApprovalReason(e.target.value)}
+                              disabled={!canApprove}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                            />
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2">
+                            <button
+                              onClick={() => pendingApproval && handleDecision(pendingApproval.id, 'REJECTED')}
+                              disabled={approving || !pendingApproval || !canApprove}
+                              className="px-4 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50"
+                            >
+                              Reject Action
+                            </button>
+                            <button
+                              onClick={() => pendingApproval && handleDecision(pendingApproval.id, 'APPROVED')}
+                              disabled={approving || !pendingApproval || !canApprove}
+                              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20 transition disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Approve & Finalize Action</span>
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

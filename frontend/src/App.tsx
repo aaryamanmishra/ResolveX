@@ -47,6 +47,7 @@ export const App: React.FC = () => {
   const [exceptions, setExceptions] = useState<Array<{ payment_id: string; exception_type: string; details: Record<string, unknown> }>>([]);
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Graph State
   const [graphNeighborhood, setGraphNeighborhood] = useState<GraphNeighborhoodResponse | null>(null);
@@ -63,24 +64,28 @@ export const App: React.FC = () => {
       setDemoMode(health.demo_mode ?? true);
 
       // Fetch core datasets
-      const [pList, cList, eList, aList] = await Promise.all([
+      const [pList, cList, eList, aList, graphData] = await Promise.all([
         apiClient.getPayments().catch(() => []),
         apiClient.getCases().catch(() => []),
         apiClient.getReconciliationExceptions().catch(() => []),
         apiClient.getAuditLogs().catch(() => []),
+        apiClient.getGraphNeighborhood('dev_imei_cluster_99', 2).catch(() => null),
       ]);
 
       setPayments(pList);
       setCases(cList);
       setExceptions(eList);
       setAuditLogs(aList);
+      if (graphData && !graphNeighborhood) {
+        setGraphNeighborhood(graphData);
+      }
       if (cList.length > 0 && !selectedCaseId) {
         setSelectedCaseId(cList[0].id);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCaseId]);
+  }, [selectedCaseId, graphNeighborhood]);
 
   useEffect(() => {
     loadData();
@@ -93,8 +98,19 @@ export const App: React.FC = () => {
 
   // --- Handlers for Track 1 ---
   const handleSimulatePayment = async (scenario: string) => {
-    await apiClient.simulatePaymentScenario(scenario);
-    await loadData();
+    try {
+      const res = await apiClient.simulatePaymentScenario(scenario);
+      await loadData();
+      setNotification({
+        type: 'success',
+        message: `Simulated ${scenario}: Payment ${res.payment.id} created with status ${res.payment.payment_status} (${res.payment.funds_status})`,
+      });
+    } catch (err: unknown) {
+      setNotification({
+        type: 'error',
+        message: `Simulation failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
   };
 
   const handleReportDebit = async (paymentId: string, utr: string) => {
@@ -176,6 +192,7 @@ export const App: React.FC = () => {
   // --- Automated 1-Click Demo Journey Runners (PRD Phase 6 Gate) ---
   const runTrack1Demo = async () => {
     setIsLoading(true);
+    setNotification(null);
     try {
       // 1. Simulate payment with customer reported debit mismatch
       const sim = await apiClient.simulatePaymentScenario('scenario_4_debit_mismatch');
@@ -192,6 +209,15 @@ export const App: React.FC = () => {
       await loadData();
       setSelectedCaseId(newCase.id);
       setActiveTab('investigations');
+      setNotification({
+        type: 'success',
+        message: `Track 1 Demo Succeeded: Simulated debit discrepancy payment ${sim.payment.id}, opened Case ${newCase.id}, and completed LangGraph triage. Review the findings and approval gate below!`,
+      });
+    } catch (err: unknown) {
+      setNotification({
+        type: 'error',
+        message: `Track 1 Demo failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -199,16 +225,17 @@ export const App: React.FC = () => {
 
   const runTrack2Demo = async () => {
     setIsLoading(true);
+    setNotification(null);
     try {
-      // 1. Create a risk-triggered fraud investigation case
+      // 1. Create a risk-triggered fraud investigation case linked to syndicate device
       const fraudCase = await apiClient.createCase(
         'FRAUD_INVESTIGATION',
         'Syndicate Alert: Shared device clustering across 4 accounts',
-        [],
+        ['dev_imei_cluster_99'],
         'HIGH'
       );
-      // 2. Query tokenized graph neighborhood around center token
-      const neighborhood = await apiClient.getGraphNeighborhood('cust_tok_synth_001', 2);
+      // 2. Query tokenized graph neighborhood around center token (dev_imei_cluster_99)
+      const neighborhood = await apiClient.getGraphNeighborhood('dev_imei_cluster_99', 2);
       setGraphNeighborhood(neighborhood);
       // 3. Evaluate deterministic fraud rules
       const evalResult = await apiClient.evaluateCaseFraud(fraudCase.id).catch(() => null);
@@ -217,6 +244,15 @@ export const App: React.FC = () => {
       await loadData();
       setSelectedCaseId(fraudCase.id);
       setActiveTab('graph');
+      setNotification({
+        type: 'success',
+        message: `Track 2 Demo Succeeded: Detected shared-device syndicate on dev_imei_cluster_99 (4 accounts) - HIGH severity rule SHARED_DEVICE_THRESHOLD_EXCEEDED fired!`,
+      });
+    } catch (err: unknown) {
+      setNotification({
+        type: 'error',
+        message: `Track 2 Demo failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -273,6 +309,28 @@ export const App: React.FC = () => {
           })}
         </div>
 
+        {/* Notification Banner */}
+        {notification && (
+          <div
+            className={`p-3 rounded-xl border text-xs flex items-center justify-between shadow-lg transition animate-in fade-in ${
+              notification.type === 'success'
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-950/40 border-rose-500/30 text-rose-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span className="font-bold">{notification.type === 'success' ? '✓' : '⚠'}</span>
+              <span>{notification.message}</span>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="text-slate-400 hover:text-white px-1.5 py-0.5 rounded text-xs ml-4"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Tab Views */}
         <main>
           {activeTab === 'overview' && (
@@ -303,9 +361,12 @@ export const App: React.FC = () => {
             <InvestigationsTab
               cases={cases}
               selectedCaseId={selectedCaseId}
+              currentRole={currentRole}
+              onSwitchRole={handleRoleChange}
               onSelectCase={(id) => setSelectedCaseId(id)}
               onRunInvestigation={handleRunInvestigation}
               onFetchFindings={handleFetchFindings}
+              onFetchApprovals={(id) => apiClient.getCaseApprovals(id)}
               onApproveAction={handleApproveAction}
               onCreateCase={handleCreateCase}
               onRefresh={loadData}

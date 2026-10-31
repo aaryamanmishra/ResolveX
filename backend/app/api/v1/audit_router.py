@@ -16,7 +16,12 @@ def list_audit_events(
     resource_type: str | None = None,
     limit: int = 100,
     ctx: TenantContext = Depends(
-        require_roles(UserRole.SUPERVISOR, UserRole.PLATFORM_ADMIN, UserRole.FRAUD_ANALYST)
+        require_roles(
+            UserRole.SUPPORT_ANALYST,
+            UserRole.FRAUD_ANALYST,
+            UserRole.SUPERVISOR,
+            UserRole.PLATFORM_ADMIN,
+        )
     ),
 ) -> list[AuditEvent]:
     """List tamper-evident audit events scoped strictly to the current tenant."""
@@ -32,7 +37,12 @@ def get_resource_audit_history(
     resource_id: str,
     limit: int = 50,
     ctx: TenantContext = Depends(
-        require_roles(UserRole.SUPERVISOR, UserRole.PLATFORM_ADMIN, UserRole.FRAUD_ANALYST)
+        require_roles(
+            UserRole.SUPPORT_ANALYST,
+            UserRole.FRAUD_ANALYST,
+            UserRole.SUPERVISOR,
+            UserRole.PLATFORM_ADMIN,
+        )
     ),
 ) -> list[AuditEvent]:
     """Retrieve immutable audit trail for a specific resource ID within tenant boundary."""

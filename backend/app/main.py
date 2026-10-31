@@ -3,6 +3,8 @@
 Provides API routes, health checks, OpenAPI specifications, and integration endpoints.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,6 +14,16 @@ from backend.app.config import settings
 from backend.app.graph.graph_store import MemoryGraphStore
 from backend.app.providers.model_provider import StubModelProvider
 from backend.app.providers.payment_provider import SimulatorPaymentProvider
+from backend.app.services.seed_service import seed_demo_data
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle event handler: seed demo data in demo mode."""
+    if settings.DEMO_MODE:
+        seed_demo_data()
+    yield
+
 
 app = FastAPI(
     title="ResolveX AI",
@@ -19,7 +31,9 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
+
 
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
@@ -76,3 +90,9 @@ def get_graph_health() -> dict:
         "edge_count": health.edge_count,
         "details": health.details,
     }
+
+
+@app.post("/api/v1/admin/seed-demo", tags=["Admin"])
+def seed_demo_endpoint() -> dict:
+    """Manually trigger synthetic demo seed data."""
+    return seed_demo_data()

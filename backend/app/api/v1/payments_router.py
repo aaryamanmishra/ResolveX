@@ -32,6 +32,39 @@ class ReportDebitRequest(BaseModel):
     note: str | None = None
 
 
+class SimulatePaymentRequest(BaseModel):
+    scenario: str
+    amount_minor: int = 50000
+    currency: str = "INR"
+    merchant_id: str = "merch_apex_01"
+
+
+class SimulatePaymentResponse(BaseModel):
+    payment: Payment
+    event: PaymentEvent | None = None
+
+
+@payments_router.post(
+    "/simulate", response_model=SimulatePaymentResponse, status_code=status.HTTP_201_CREATED
+)
+def simulate_payment_scenario(
+    req: SimulatePaymentRequest,
+    request: Request,
+    ctx: TenantContext = Depends(get_current_tenant_context),
+) -> SimulatePaymentResponse:
+    """Create controlled synthetic payment scenario (PRD §11 & §15.1 demo)."""
+    correlation_id = getattr(request.state, "correlation_id", None)
+    payment, event = payment_service.simulate_scenario(
+        ctx=ctx,
+        scenario=req.scenario,
+        amount_minor=req.amount_minor,
+        currency=req.currency,
+        merchant_id=req.merchant_id,
+        correlation_id=correlation_id,
+    )
+    return SimulatePaymentResponse(payment=payment, event=event)
+
+
 @payments_router.post("", response_model=Payment, status_code=status.HTTP_201_CREATED)
 def create_payment(
     req: CreatePaymentRequest,

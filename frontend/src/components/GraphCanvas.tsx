@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GraphNeighborhoodResponse, GraphNode, FraudEvaluationResponse } from '../api';
 import {
   Network,
@@ -27,8 +27,14 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   onSearchNeighborhood,
   isLoading,
 }) => {
-  const [searchToken, setSearchToken] = useState('cust_tok_synth_001');
+  const [searchToken, setSearchToken] = useState('dev_imei_cluster_99');
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+
+  useEffect(() => {
+    if (!neighborhood && !isLoading) {
+      onSearchNeighborhood('dev_imei_cluster_99', 2);
+    }
+  }, [neighborhood, isLoading, onSearchNeighborhood]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

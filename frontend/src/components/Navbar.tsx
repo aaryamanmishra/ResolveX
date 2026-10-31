@@ -54,22 +54,24 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Quick Demo Controls */}
-        <div className="hidden md:flex items-center space-x-2">
+        <div className="flex items-center space-x-2">
           <button
             onClick={onRunTrack1Demo}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-sky-400 border border-slate-700 transition"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-sky-400 border border-slate-700 transition shadow-sm"
             title="Auto-runs Track 1 payment discrepancy triage demo"
           >
             <PlayCircle className="w-3.5 h-3.5 text-sky-400" />
-            <span>Track 1 Demo</span>
+            <span className="hidden sm:inline">Track 1 Demo</span>
+            <span className="sm:hidden">T1 Demo</span>
           </button>
           <button
             onClick={onRunTrack2Demo}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-rose-400 border border-slate-700 transition"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-medium text-rose-400 border border-slate-700 transition shadow-sm"
             title="Auto-runs Track 2 graph syndicate fraud investigation demo"
           >
             <PlayCircle className="w-3.5 h-3.5 text-rose-400" />
-            <span>Track 2 Demo</span>
+            <span className="hidden sm:inline">Track 2 Demo</span>
+            <span className="sm:hidden">T2 Demo</span>
           </button>
         </div>
 
