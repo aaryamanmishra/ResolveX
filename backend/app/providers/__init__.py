@@ -13,6 +13,7 @@ from backend.app.providers.payment_provider import (
     PaymentProviderAdapter,
     SimulatorPaymentProvider,
 )
+from backend.app.providers.razorpay_provider import RazorpayPaymentProvider
 
 __all__ = [
     "EvidenceExtractionResult",
@@ -20,6 +21,7 @@ __all__ = [
     "ModelRequest",
     "PaymentProviderAdapter",
     "ProviderHealth",
+    "RazorpayPaymentProvider",
     "SimulatorPaymentProvider",
     "StructuredResult",
     "StubModelProvider",

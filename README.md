@@ -129,4 +129,26 @@ Inspect API documentation at `http://localhost:8000/docs`.
 - [x] Cross-tenant access tests fail closed (HTTP 403 / `SecurityError`).
 - [x] Structured audit logging (`AuditService` & `GET /api/v1/audit`) recording tamper-evident SHA-256 metadata hashes on every state mutation.
 - [x] Human approval recording (`Approval` workflow) for high-risk actions.
-- [x] Quality gates passing: 33/33 tests passing with Ruff format/lint and mypy static typing clean.
+
+---
+
+## Phase 2 Status & Verification Report (Payment Ingestion, Tracking & Reconciliation)
+
+- [x] Payment provider abstraction supporting both `SimulatorPaymentProvider` and `RazorpayPaymentProvider`.
+- [x] Signed webhook receiver (`POST /api/v1/webhooks/{provider}`) with exact raw-body HMAC-SHA256 signature verification.
+- [x] Idempotency engine deduplicating replayed webhooks via `{tenant}:{provider}:{event_id}` without duplicate state application.
+- [x] Status normalizer mapping provider states to canonical `PaymentStatus` and `FundsStatus`.
+- [x] Append-only event timeline (`GET /api/v1/payments/{payment_id}/timeline`) preserving event times and received timestamps.
+- [x] Out-of-order webhook delivery handling: terminal states (`SUCCEEDED`, `FAILED`, `REVERSED`) cannot regress to intermediate states.
+- [x] Separate claim vs truth tracking: customer debit reporting (`POST /api/v1/payments/{payment_id}/report-debit`) sets `funds_status=CUSTOMER_REPORTED_DEBIT` without claiming provider debit.
+- [x] Reconciliation engine (`GET /api/v1/payments/exceptions/queue`) automatically detecting:
+  - Scenario 1: Normal payment success
+  - Scenario 2: Pending payment
+  - Scenario 3: Failed payment
+  - Scenario 4: Customer reported debit mismatch
+  - Scenario 5: Duplicate webhook
+  - Scenario 6: Out-of-order delivery
+  - Scenario 7: Refund pending past SLA (> 5 days)
+  - Scenario 8: Amount mismatch (order expected vs provider reported)
+  - Scenario 9: Missing order mapping
+- [x] Quality gates passing: 44/44 tests passing with Ruff format/lint and mypy static typing clean.
