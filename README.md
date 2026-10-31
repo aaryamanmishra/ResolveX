@@ -152,3 +152,21 @@ Inspect API documentation at `http://localhost:8000/docs`.
   - Scenario 8: Amount mismatch (order expected vs provider reported)
   - Scenario 9: Missing order mapping
 - [x] Quality gates passing: 44/44 tests passing with Ruff format/lint and mypy static typing clean.
+
+---
+
+## Phase 3 Status & Verification Report (Graph Model & Fraud Investigation Base)
+
+- [x] GraphStore abstraction implementing `ApacheAGEGraphStore` (open-source default with openCypher builder) and optional `TigerGraphGraphStore`.
+- [x] Graph materialization pipeline (`GraphService`) tokenizing customer, device, instrument, and UPI references via tenant-scoped HMAC.
+- [x] Bounded graph traversals (depth clamped strictly between 1 and 4, max node limits enforced).
+- [x] Tenant-isolated graph store queries (Tenant B cannot traverse Tenant A's relationships).
+- [x] Deterministic fraud policy engine (`DeterministicFraudRuleEngine`) with reproducible reason codes:
+  - Scenario 1: Shared device syndicate ($> 3$ customer tokens on 1 device) $\rightarrow$ `SHARED_DEVICE_THRESHOLD_EXCEEDED` (`HIGH` severity, requires human review).
+  - Scenario 2: Repeated attempts across multiple instruments $\rightarrow$ `REPEATED_ATTEMPTS_MULTI_INSTRUMENTS` (`HIGH` severity).
+  - Scenario 3: Transaction velocity bursts $\rightarrow$ `UNUSUAL_TRANSACTION_VELOCITY` (`MEDIUM` severity).
+  - Scenario 4: Direct or 2-hop connection to prior flagged fraud cases $\rightarrow$ `CONNECTED_TO_HISTORICAL_FRAUD_CASE` (`CRITICAL` severity).
+  - Scenario 5: Benign shared device filter ($\le 2$ users sharing family tablet) $\rightarrow$ automated fraud alert suppressed (preventing false-positive verdicts).
+  - Scenario 6: Strict query bounding and provenance tracking.
+- [x] REST API endpoints (`GET /api/v1/cases/{case_id}/graph`, `GET /api/v1/graph/neighborhood/{entity_token}`, `POST /api/v1/cases/{case_id}/evaluate-fraud`).
+- [x] Quality gates passing: 53/53 tests passing with Ruff format/lint and mypy static typing clean.
