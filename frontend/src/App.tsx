@@ -18,35 +18,30 @@ import {
   VerificationState,
 } from './types/contracts';
 
-import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { Header } from './components/Header';
 import { OverviewTab } from './components/OverviewTab';
 import { PaymentsTab } from './components/PaymentsTab';
 import { InvestigationsTab } from './components/InvestigationsTab';
-import { GraphCanvas } from './components/GraphCanvas';
 import { EvidenceTab } from './components/EvidenceTab';
 import { AuditTab } from './components/AuditTab';
 
-import {
-  LayoutDashboard,
-  CreditCard,
-  FolderOpen,
-  Network,
-  UploadCloud,
-  Shield,
-} from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [currentRole, setCurrentRole] = useState<UserRole>('SUPPORT_ANALYST');
   const [demoMode, setDemoMode] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
-  // Core Data State
+  // Core Datasets
   const [payments, setPayments] = useState<Payment[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [exceptions, setExceptions] = useState<Array<{ payment_id: string; exception_type: string; details: Record<string, unknown> }>>([]);
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Graph State
@@ -148,22 +143,11 @@ export const App: React.FC = () => {
 
   // --- Handlers for Graph ---
   const handleSearchNeighborhood = async (entityToken: string, depth: number = 2) => {
-    setIsLoading(true);
     try {
       const res = await apiClient.getGraphNeighborhood(entityToken, depth);
       setGraphNeighborhood(res);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEvaluateFraud = async (caseId: string) => {
-    setIsLoading(true);
-    try {
-      const res = await apiClient.evaluateCaseFraud(caseId);
-      setFraudEval(res);
-    } finally {
-      setIsLoading(false);
+    } catch {
+      // Keep existing neighborhood if query fails
     }
   };
 
@@ -189,7 +173,7 @@ export const App: React.FC = () => {
     await loadData();
   };
 
-  // --- Automated 1-Click Demo Journey Runners (PRD Phase 6 Gate) ---
+  // --- Demo Flows ---
   const runTrack1Demo = async () => {
     setIsLoading(true);
     setNotification(null);
@@ -211,7 +195,7 @@ export const App: React.FC = () => {
       setActiveTab('investigations');
       setNotification({
         type: 'success',
-        message: `Track 1 Demo Succeeded: Simulated debit discrepancy payment ${sim.payment.id}, opened Case ${newCase.id}, and completed LangGraph triage. Review the findings and approval gate below!`,
+        message: `Track 1 Succeeded: Simulated payment ${sim.payment.id}, opened Case ${newCase.id}, and completed LangGraph triage. Review the findings and approval gate.`,
       });
     } catch (err: unknown) {
       setNotification({
@@ -240,13 +224,13 @@ export const App: React.FC = () => {
       // 3. Evaluate deterministic fraud rules
       const evalResult = await apiClient.evaluateCaseFraud(fraudCase.id).catch(() => null);
       if (evalResult) setFraudEval(evalResult);
-      // 4. Reload and navigate to graph canvas
+      // 4. Reload and navigate to investigations
       await loadData();
       setSelectedCaseId(fraudCase.id);
-      setActiveTab('graph');
+      setActiveTab('investigations');
       setNotification({
         type: 'success',
-        message: `Track 2 Demo Succeeded: Detected shared-device syndicate on dev_imei_cluster_99 (4 accounts) - HIGH severity rule SHARED_DEVICE_THRESHOLD_EXCEEDED fired!`,
+        message: `Track 2 Succeeded: Detected shared-device syndicate on dev_imei_cluster_99 (4 accounts) - rule SHARED_DEVICE_THRESHOLD_EXCEEDED fired!`,
       });
     } catch (err: unknown) {
       setNotification({
@@ -259,147 +243,132 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      <Navbar
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased">
+      {/* Clean Desktop Sidebar / Responsive Drawer */}
+      <Sidebar
+        activeTab={activeTab}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         currentRole={currentRole}
         onRoleChange={handleRoleChange}
         tenantId={apiClient.currentTenantId}
         demoMode={demoMode}
-        onRunTrack1Demo={runTrack1Demo}
-        onRunTrack2Demo={runTrack2Demo}
+        paymentCount={payments.length}
+        caseCount={cases.length}
+        exceptionCount={exceptions.length}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Main Container */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 border-b border-slate-800 pb-2 overflow-x-auto">
-          {[
-            { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-            { id: 'payments', label: 'Payments & Reconciliation', icon: CreditCard, count: payments.length },
-            { id: 'investigations', label: 'Investigations & Cases', icon: FolderOpen, count: cases.length },
-            { id: 'graph', label: 'Graph Fraud Canvas', icon: Network },
-            { id: 'evidence', label: 'Multimodal Evidence', icon: UploadCloud },
-            { id: 'audit', label: 'Audit Trail', icon: Shield, count: auditLogs.length },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                  isActive
-                    ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      isActive ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Top Header */}
+        <Header
+          activeTab={activeTab}
+          onRefresh={loadData}
+          isLoading={isLoading}
+          onRunTrack1Demo={runTrack1Demo}
+          onRunTrack2Demo={runTrack2Demo}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        />
 
-        {/* Notification Banner */}
-        {notification && (
-          <div
-            className={`p-3 rounded-xl border text-xs flex items-center justify-between shadow-lg transition animate-in fade-in ${
-              notification.type === 'success'
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                : 'bg-rose-950/40 border-rose-500/30 text-rose-300'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <span className="font-bold">{notification.type === 'success' ? '✓' : '⚠'}</span>
-              <span>{notification.message}</span>
-            </div>
-            <button
-              onClick={() => setNotification(null)}
-              className="text-slate-400 hover:text-white px-1.5 py-0.5 rounded text-xs ml-4"
+        {/* Page Container */}
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-5">
+          {/* Subtle Notification Toast */}
+          {notification && (
+            <div
+              className={`p-3 rounded-lg border text-xs flex items-center justify-between shadow-xs transition-all animate-in fade-in ${
+                notification.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}
             >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Tab Views */}
-        <main>
-          {activeTab === 'overview' && (
-            <OverviewTab
-              paymentCount={payments.length}
-              caseCount={cases.length}
-              exceptionCount={exceptions.length}
-              approvalCount={cases.filter((c) => c.case_status === 'REVIEW_REQUIRED').length}
-              fraudAlertCount={cases.filter((c) => c.case_type === 'FRAUD_INVESTIGATION').length}
-              onNavigate={(tab) => setActiveTab(tab)}
-              onRunTrack1Demo={runTrack1Demo}
-              onRunTrack2Demo={runTrack2Demo}
-            />
+              <div className="flex items-center space-x-2">
+                {notification.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span className="font-medium">{notification.message}</span>
+              </div>
+              <button
+                onClick={() => setNotification(null)}
+                className="text-slate-400 hover:text-slate-700 px-1 py-0.5 rounded text-xs ml-4"
+              >
+                ✕
+              </button>
+            </div>
           )}
 
-          {activeTab === 'payments' && (
-            <PaymentsTab
-              payments={payments}
-              exceptions={exceptions}
-              onRefresh={loadData}
-              onSimulate={handleSimulatePayment}
-              onReportDebit={handleReportDebit}
-              onFetchTimeline={handleFetchTimeline}
-            />
-          )}
+          {/* Active Tab View */}
+          <main>
+            {activeTab === 'overview' && (
+              <OverviewTab
+                paymentCount={payments.length}
+                caseCount={cases.length}
+                exceptionCount={exceptions.length}
+                approvalCount={cases.filter((c) => c.case_status === 'REVIEW_REQUIRED').length}
+                cases={cases}
+                payments={payments}
+                exceptions={exceptions}
+                auditLogs={auditLogs}
+                onNavigate={(tab) => setActiveTab(tab)}
+                onSelectCase={(id) => setSelectedCaseId(id)}
+                onSelectPayment={(id) => setSelectedPaymentId(id)}
+              />
+            )}
 
-          {activeTab === 'investigations' && (
-            <InvestigationsTab
-              cases={cases}
-              selectedCaseId={selectedCaseId}
-              currentRole={currentRole}
-              onSwitchRole={handleRoleChange}
-              onSelectCase={(id) => setSelectedCaseId(id)}
-              onRunInvestigation={handleRunInvestigation}
-              onFetchFindings={handleFetchFindings}
-              onFetchApprovals={(id) => apiClient.getCaseApprovals(id)}
-              onApproveAction={handleApproveAction}
-              onCreateCase={handleCreateCase}
-              onRefresh={loadData}
-            />
-          )}
+            {activeTab === 'payments' && (
+              <PaymentsTab
+                payments={payments}
+                exceptions={exceptions}
+                onRefresh={loadData}
+                onSimulate={handleSimulatePayment}
+                onReportDebit={handleReportDebit}
+                onFetchTimeline={handleFetchTimeline}
+                initialSelectedPaymentId={selectedPaymentId}
+              />
+            )}
 
-          {activeTab === 'graph' && (
-            <GraphCanvas
-              neighborhood={graphNeighborhood}
-              fraudEval={fraudEval}
-              onSearchNeighborhood={handleSearchNeighborhood}
-              onEvaluateFraud={handleEvaluateFraud}
-              isLoading={isLoading}
-            />
-          )}
+            {activeTab === 'investigations' && (
+              <InvestigationsTab
+                cases={cases}
+                selectedCaseId={selectedCaseId}
+                currentRole={currentRole}
+                onSwitchRole={handleRoleChange}
+                onSelectCase={(id) => setSelectedCaseId(id)}
+                onRunInvestigation={handleRunInvestigation}
+                onFetchFindings={handleFetchFindings}
+                onFetchApprovals={(id) => apiClient.getCaseApprovals(id)}
+                onApproveAction={handleApproveAction}
+                onCreateCase={handleCreateCase}
+                onRefresh={loadData}
+                graphNeighborhood={graphNeighborhood}
+                fraudEval={fraudEval}
+                onSearchNeighborhood={handleSearchNeighborhood}
+              />
+            )}
 
-          {activeTab === 'evidence' && (
-            <EvidenceTab
-              cases={cases}
-              onUploadEvidence={handleUploadEvidence}
-              onConfirmClaim={handleConfirmClaim}
-              isLoading={isLoading}
-            />
-          )}
+            {activeTab === 'evidence' && (
+              <EvidenceTab
+                cases={cases}
+                onUploadEvidence={handleUploadEvidence}
+                onConfirmClaim={handleConfirmClaim}
+                isLoading={isLoading}
+              />
+            )}
 
-          {activeTab === 'audit' && (
-            <AuditTab
-              logs={auditLogs}
-              onRefresh={loadData}
-              isLoading={isLoading}
-            />
-          )}
-        </main>
+            {activeTab === 'audit' && (
+              <AuditTab
+                logs={auditLogs}
+                onRefresh={loadData}
+                isLoading={isLoading}
+              />
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

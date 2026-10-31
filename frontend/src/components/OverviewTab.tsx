@@ -1,13 +1,14 @@
 import React from 'react';
+import { Case, Payment } from '../types/contracts';
+import { AuditRecord } from '../api';
 import {
-  CreditCard,
-  AlertTriangle,
-  FolderOpen,
-  UserCheck,
-  Network,
   ArrowRight,
-  Sparkles,
+  AlertCircle,
+  ShieldAlert,
+  CreditCard,
+  FolderOpen,
   CheckCircle2,
+  History,
 } from 'lucide-react';
 
 interface OverviewTabProps {
@@ -15,10 +16,13 @@ interface OverviewTabProps {
   caseCount: number;
   exceptionCount: number;
   approvalCount: number;
-  fraudAlertCount: number;
+  cases: Case[];
+  payments: Payment[];
+  exceptions: Array<{ payment_id: string; exception_type: string; details: Record<string, unknown> }>;
+  auditLogs: AuditRecord[];
   onNavigate: (tab: string) => void;
-  onRunTrack1Demo: () => void;
-  onRunTrack2Demo: () => void;
+  onSelectCase: (caseId: string) => void;
+  onSelectPayment: (paymentId: string) => void;
 }
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({
@@ -26,197 +30,335 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   caseCount,
   exceptionCount,
   approvalCount,
-  fraudAlertCount,
+  cases,
+  payments,
+  exceptions,
+  auditLogs,
   onNavigate,
-  onRunTrack1Demo,
-  onRunTrack2Demo,
+  onSelectCase,
+  onSelectPayment,
 }) => {
+  const pendingCases = cases.filter(
+    (c) => c.case_status === 'REVIEW_REQUIRED' || c.priority === 'HIGH' || c.priority === 'CRITICAL'
+  );
+
+  const formatCurrency = (amountMinor?: number, currency = 'INR') => {
+    if (amountMinor === undefined) return '—';
+    const major = (amountMinor / 100).toFixed(2);
+    return `${currency === 'INR' ? '₹' : currency} ${major}`;
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'CRITICAL':
+        return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'HIGH':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'MEDIUM':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      default:
+        return 'bg-slate-50 text-slate-600 border-slate-200';
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'REVIEW_REQUIRED':
+        return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'IN_PROGRESS':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'NEW':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'RESOLVED':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      default:
+        return 'bg-slate-50 text-slate-600 border-slate-200';
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-sky-900/40 via-indigo-900/30 to-slate-900 border border-sky-500/20 p-6 md:p-8">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Dual-Track Autonomous Financial Operations</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-            Evidence-Grounded Payment Resolution & Graph Fraud Intelligence
-          </h1>
-          <p className="mt-2 text-slate-300 text-sm md:text-base leading-relaxed">
-            ResolveX AI unifies payment lifecycle tracking and agentic relationship graph analytics.
-            Every AI finding is cryptographically cited to verified receipts or timeline events, with deterministic
-            policy governance and mandatory human approval for financial side effects.
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Overview</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            A quick look at payment operations and investigations requiring attention.
           </p>
+        </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={onRunTrack1Demo}
-              className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold shadow-lg shadow-sky-600/30 flex items-center space-x-2 transition"
-            >
-              <span>Run Track 1 Demo (Payment Triage)</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onRunTrack2Demo}
-              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold shadow-lg shadow-rose-600/30 flex items-center space-x-2 transition"
-            >
-              <span>Run Track 2 Demo (Syndicate Fraud)</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => onNavigate('payments')}
+            className="px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs transition-colors flex items-center space-x-1.5"
+          >
+            <span>Review payments</span>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+          <button
+            onClick={() => onNavigate('investigations')}
+            className="px-3 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-xs transition-colors flex items-center space-x-1.5"
+          >
+            <span>Open investigations</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div
-          onClick={() => onNavigate('payments')}
-          className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-sky-500/40 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Payments Ingested</span>
-            <CreditCard className="w-4 h-4 text-sky-400" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-white">{paymentCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Gateway verified events</p>
+      {/* First Section: Needs Attention (Key Operational Metrics) */}
+      <section>
+        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          Needs Attention
         </div>
-
-        <div
-          onClick={() => onNavigate('investigations')}
-          className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-indigo-500/40 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Open Cases</span>
-            <FolderOpen className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-white">{caseCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Triage & fraud hub</p>
-        </div>
-
-        <div
-          onClick={() => onNavigate('payments')}
-          className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-amber-500/40 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Reconciliation Alerts</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-amber-400">{exceptionCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Discrepancy queue</p>
-        </div>
-
-        <div
-          onClick={() => onNavigate('investigations')}
-          className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-purple-500/40 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Pending Approvals</span>
-            <UserCheck className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-purple-400">{approvalCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Human review gate</p>
-        </div>
-
-        <div
-          onClick={() => onNavigate('graph')}
-          className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-rose-500/40 transition cursor-pointer"
-        >
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Fraud Ring Alerts</span>
-            <Network className="w-4 h-4 text-rose-400" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-rose-400">{fraudAlertCount}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Graph syndicates</p>
-        </div>
-      </div>
-
-      {/* Track Explanatory Cards */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Track 1 Card */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
-              <CreditCard className="w-4 h-4" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Card 1: Open Investigations */}
+          <div
+            onClick={() => onNavigate('investigations')}
+            className="bg-white border border-slate-200 rounded-lg p-4 shadow-2xs hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Open investigations</span>
+              <FolderOpen className="w-4 h-4 text-blue-600 group-hover:scale-105 transition-transform" />
             </div>
-            <div>
-              <h3 className="font-semibold text-white text-base">Track 1: Payment Issue Resolution</h3>
-              <p className="text-xs text-slate-400">Webhook ingress, state machine, SLA & debit reconciliation</p>
+            <div className="mt-2 text-2xl font-bold text-slate-900 tracking-tight">
+              {caseCount}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 flex items-center space-x-1">
+              <span>{cases.filter((c) => c.priority === 'HIGH' || c.priority === 'CRITICAL').length} high/critical priority</span>
             </div>
           </div>
-          <ul className="space-y-2 text-xs text-slate-300">
-            <li className="flex items-start space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <span>Normalizes gateway states (`payment_status`) distinctly from customer claims (`funds_status`).</span>
-            </li>
-            <li className="flex items-start space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <span>Append-only event timeline preventing out-of-order regression of terminal states.</span>
-            </li>
-            <li className="flex items-start space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <span>Automated reconciliation detects unconfirmed debits, amount mismatches, and refund SLA breaches (&gt; 5 days).</span>
-            </li>
-          </ul>
-          <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
-            <button
-              onClick={onRunTrack1Demo}
-              className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-md shadow-sky-600/20 transition flex items-center space-x-1.5"
-            >
-              <span>▶ Run Track 1 Demo</span>
-            </button>
+
+          {/* Card 2: Reconciliation Exceptions */}
+          <div
+            onClick={() => onNavigate('payments')}
+            className="bg-white border border-slate-200 rounded-lg p-4 shadow-2xs hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Reconciliation exceptions</span>
+              <AlertCircle className="w-4 h-4 text-amber-600 group-hover:scale-105 transition-transform" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 tracking-tight">
+              {exceptionCount}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              Customer debit claims & SLA breaches
+            </div>
+          </div>
+
+          {/* Card 3: Pending Approvals */}
+          <div
+            onClick={() => onNavigate('investigations')}
+            className="bg-white border border-slate-200 rounded-lg p-4 shadow-2xs hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Pending approvals</span>
+              <ShieldAlert className="w-4 h-4 text-purple-600 group-hover:scale-105 transition-transform" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 tracking-tight">
+              {approvalCount}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              Requires supervisor sign-off
+            </div>
+          </div>
+
+          {/* Card 4: Ingested Transactions */}
+          <div
+            onClick={() => onNavigate('payments')}
+            className="bg-white border border-slate-200 rounded-lg p-4 shadow-2xs hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+              <span>Payments ingested</span>
+              <CreditCard className="w-4 h-4 text-emerald-600 group-hover:scale-105 transition-transform" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 tracking-tight">
+              {payments.length > 0 ? payments.length : paymentCount}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              Gateway authenticated timeline
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Next Section: Actionable Queues (Two Columns) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column: Recent Payment Exceptions */}
+        <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <h2 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">
+                Recent Payment Exceptions
+              </h2>
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">
+              {exceptions.length} detected
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 flex-1">
+            {exceptions.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto mb-1.5 opacity-80" />
+                No unconfirmed debit discrepancies or SLA breaches.
+              </div>
+            ) : (
+              exceptions.slice(0, 4).map((ex, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    onSelectPayment(ex.payment_id);
+                    onNavigate('payments');
+                  }}
+                  className="p-3.5 hover:bg-slate-50/80 transition-colors cursor-pointer flex items-start justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-1 truncate">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-[11px] font-semibold text-slate-900">
+                        {ex.payment_id}
+                      </span>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-xs border bg-amber-50 text-amber-700 border-amber-200">
+                        {ex.exception_type}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-[11px] truncate">
+                      {String(ex.details?.order_ref ? `Order ${ex.details.order_ref}` : 'Unconfirmed customer debit')}
+                      {ex.details?.amount_minor ? ` • ${formatCurrency(Number(ex.details.amount_minor))}` : ''}
+                    </p>
+                  </div>
+                  <button className="text-[11px] text-blue-600 hover:text-blue-700 font-medium shrink-0 flex items-center space-x-0.5 pt-0.5">
+                    <span>Inspect</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="p-2.5 bg-slate-50/50 border-t border-slate-100 text-center">
             <button
               onClick={() => onNavigate('payments')}
-              className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center space-x-1"
+              className="text-xs text-slate-600 hover:text-slate-900 font-medium"
             >
-              <span>Open Payments Console</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              View all payment records →
             </button>
           </div>
         </div>
 
-        {/* Track 2 Card */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-              <Network className="w-4 h-4" />
+        {/* Right Column: Investigations Requiring Review */}
+        <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              <h2 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">
+                Investigations Requiring Review
+              </h2>
             </div>
-            <div>
-              <h3 className="font-semibold text-white text-base">Track 2: Agentic Fraud Investigation</h3>
-              <p className="text-xs text-slate-400">Tokenized relationship graph, syndicate detection & policy gate</p>
-            </div>
+            <span className="text-[11px] text-slate-500 font-medium">
+              {pendingCases.length} prioritized
+            </span>
           </div>
-          <ul className="space-y-2 text-xs text-slate-300">
-            <li className="flex items-start space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span>HMAC-tokenized entities (`CustomerToken`, `DeviceToken`, `PaymentInstrumentToken`, `UPIReferenceToken`).</span>
-            </li>
-            <li className="flex items-start space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span>Deterministic heuristics detect shared device rings (&gt; 3 accounts) and smurfing without false positives.</span>
-            </li>
-            <li className="flex items-start space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span>LangGraph agent harness synthesizes findings citing evidence IDs; sensitive actions pause for supervisor approval.</span>
-            </li>
-          </ul>
-          <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
+
+          <div className="divide-y divide-slate-100 flex-1">
+            {pendingCases.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto mb-1.5 opacity-80" />
+                All operational cases reviewed and assigned.
+              </div>
+            ) : (
+              pendingCases.slice(0, 4).map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    onSelectCase(c.id);
+                    onNavigate('investigations');
+                  }}
+                  className="p-3.5 hover:bg-slate-50/80 transition-colors cursor-pointer flex items-start justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-1 truncate">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-[11px] font-semibold text-slate-900">
+                        {c.id}
+                      </span>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-xs border ${getPriorityBadge(c.priority)}`}>
+                        {c.priority}
+                      </span>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-xs border ${getStatusBadge(c.case_status)}`}>
+                        {c.case_status}
+                      </span>
+                    </div>
+                    <div className="text-slate-700 text-xs font-medium truncate">
+                      {c.title}
+                    </div>
+                  </div>
+                  <button className="text-[11px] text-blue-600 hover:text-blue-700 font-medium shrink-0 flex items-center space-x-0.5 pt-0.5">
+                    <span>Review</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="p-2.5 bg-slate-50/50 border-t border-slate-100 text-center">
             <button
-              onClick={onRunTrack2Demo}
-              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md shadow-rose-600/20 transition flex items-center space-x-1.5"
+              onClick={() => onNavigate('investigations')}
+              className="text-xs text-slate-600 hover:text-slate-900 font-medium"
             >
-              <span>▶ Run Track 2 Demo</span>
-            </button>
-            <button
-              onClick={() => onNavigate('graph')}
-              className="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center space-x-1"
-            >
-              <span>Explore Graph Canvas</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              Open all operational cases →
             </button>
           </div>
         </div>
       </div>
+
+      {/* Third Section: Recent Activity (Audit Trail Snapshot) */}
+      <section className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <History className="w-4 h-4 text-slate-500" />
+            <h2 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">
+              Recent Activity & Tamper-Evident Audit Ledger
+            </h2>
+          </div>
+          <button
+            onClick={() => onNavigate('audit')}
+            className="text-[11px] text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Full audit log →
+          </button>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {auditLogs.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-500">
+              No audit events logged yet.
+            </div>
+          ) : (
+            auditLogs.slice(0, 5).map((log) => (
+              <div key={log.id} className="px-4 py-3 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                <div className="flex items-center space-x-3 truncate">
+                  <span className="font-mono text-[11px] text-slate-400 shrink-0">
+                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                  <div className="truncate">
+                    <span className="font-semibold text-slate-800">{log.action}</span>
+                    <span className="text-slate-500 ml-1.5 truncate">
+                      on {log.resource_type} <span className="font-mono text-[11px] text-slate-700">{log.resource_id}</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3 shrink-0 text-slate-400 text-[11px]">
+                  <span className="font-mono">{log.actor_id}</span>
+                  <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 hidden sm:inline">
+                    sha256:{log.metadata_hash.slice(0, 8)}...
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 };
