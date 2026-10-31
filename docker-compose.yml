@@ -19,6 +19,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - resolvex-net
 
   valkey:
     image: valkey/valkey:7.2-alpine
@@ -31,6 +33,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - resolvex-net
 
   api:
     build:
@@ -41,18 +45,44 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=production
       - DEMO_MODE=true
       - DATABASE_URL=postgresql://resolvex:resolvex@postgres:5432/resolvex_db
       - VALKEY_URL=redis://valkey:6379/0
       - PAYMENT_PROVIDER=simulator
       - MODEL_PROVIDER=stub
       - GRAPH_ENGINE=memory
+      - JWT_SECRET_KEY=dev_jwt_secret_key_resolvex_phase7_prod_99
     depends_on:
       postgres:
         condition: service_healthy
       valkey:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - resolvex-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+    container_name: resolvex-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - resolvex-net
+
+networks:
+  resolvex-net:
+    driver: bridge
 
 volumes:
   postgres_data:

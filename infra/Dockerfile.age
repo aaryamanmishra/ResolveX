@@ -1,0 +1,16 @@
+# PostgreSQL 16 with Apache AGE graph database extension
+FROM apache/age:PG16_v1.5.0
+
+# Set environment defaults
+ENV POSTGRES_USER=resolvex \
+    POSTGRES_PASSWORD=resolvex \
+    POSTGRES_DB=resolvex_db
+
+# Pre-load age library in postgresql.conf
+RUN echo "shared_preload_libraries = 'age'" >> /usr/share/postgresql/postgresql.conf.sample
+
+# Copy initialization script to create AGE extension on startup
+COPY infra/init-age.sql /docker-entrypoint-initdb.d/000_init_age.sql
+COPY backend/migrations/001_initial_schema.sql /docker-entrypoint-initdb.d/001_initial_schema.sql
+
+EXPOSE 5432

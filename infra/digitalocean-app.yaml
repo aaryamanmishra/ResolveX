@@ -1,0 +1,113 @@
+# DigitalOcean App Platform Specification for ResolveX AI
+# Implements PRD §16, §18 & .agents/skills/platform-deployment/SKILL.md
+
+name: resolvex-ai
+region: blr # Bangalore region for Indian payment ecosystem & low-latency UPI webhook ingestion
+
+# ------------------------------------------------------------------------------
+# Managed Services (PostgreSQL & Valkey)
+# ------------------------------------------------------------------------------
+databases:
+  - name: resolvex-db
+    engine: PG
+    version: "16"
+    production: false # Set true for multi-node HA cluster
+    cluster_name: resolvex-postgres-cluster
+    db_name: resolvex_db
+    db_user: resolvex
+
+# ------------------------------------------------------------------------------
+# Services (API Backend & React Frontend)
+# ------------------------------------------------------------------------------
+services:
+  # FastAPI High-Concurrency Backend Service
+  - name: resolvex-api
+    dockerfile_path: infra/Dockerfile.api
+    source_dir: /
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: aaryamanmishra/ResolveX
+    http_port: 8000
+    instance_count: 2
+    instance_size_slug: basic-m # 1 vCPU, 2GB RAM
+    routes:
+      - path: /api
+      - path: /health
+      - path: /docs
+      - path: /openapi.json
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 15
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 3
+    envs:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: PAYMENT_PROVIDER
+        value: simulator
+      - key: MODEL_PROVIDER
+        value: stub
+      - key: GRAPH_ENGINE
+        value: memory
+      - key: DATABASE_URL
+        value: ${resolvex-db.DATABASE_URL}
+      - key: JWT_SECRET_KEY
+        type: SECRET
+        value: "generate_random_secret_at_provision_time"
+      - key: RAZORPAY_KEY_ID
+        type: SECRET
+        value: "rzp_test_TuR3oJ9jwVN188"
+      - key: RAZORPAY_KEY_SECRET
+        type: SECRET
+        value: "MRL3m4xZu4ZMmvuPY1kjC3oi"
+      - key: GEMINI_API_KEY
+        type: SECRET
+        value: "" # Optional external Gemini multimodal key
+      - key: GEMMA_ENDPOINT_URL
+        value: "http://10.245.0.10:8080/v1" # Private VPC IP to GPU Droplet
+      - key: SPACES_ACCESS_KEY
+        type: SECRET
+        value: "" # DigitalOcean Spaces access key
+      - key: SPACES_SECRET_KEY
+        type: SECRET
+        value: "" # DigitalOcean Spaces secret key
+      - key: SPACES_BUCKET
+        value: resolvex-evidence-vault
+      - key: SPACES_REGION
+        value: blr1
+    alerts:
+      - rule: CPU_UTILIZATION
+        operator: GREATER_THAN
+        value: 80
+        window: FIVE_MINUTES
+      - rule: MEM_UTILIZATION
+        operator: GREATER_THAN
+        value: 85
+        window: FIVE_MINUTES
+      - rule: RESTART_COUNT
+        operator: GREATER_THAN
+        value: 3
+        window: FIVE_MINUTES
+
+  # Single Page Application Frontend
+  - name: resolvex-frontend
+    dockerfile_path: infra/Dockerfile.frontend
+    source_dir: /
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: aaryamanmishra/ResolveX
+    http_port: 80
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
+    alerts:
+      - rule: RESTART_COUNT
+        operator: GREATER_THAN
+        value: 3
+        window: FIVE_MINUTES
