@@ -1,0 +1,87 @@
+"""Canonical domain entities, enums, and Pydantic schemas for ResolveX AI."""
+
+from backend.app.domain.audit import AgentRun, AuditEvent
+from backend.app.domain.case import Approval, Case, Merchant, Tenant, User
+from backend.app.domain.enums import (
+    ApprovalDecision,
+    CaseStatus,
+    CaseType,
+    EvidenceSourceType,
+    FraudSeverity,
+    FundsStatus,
+    PaymentStatus,
+    RefundStatus,
+    SettlementStatus,
+    UserRole,
+    VerificationState,
+)
+from backend.app.domain.evidence import EvidenceAsset, EvidenceClaim
+from backend.app.domain.findings import (
+    InvestigationFinding,
+    ModelMetadata,
+    PaymentStateSummary,
+    RecommendedNextStep,
+    StructuredInvestigationResult,
+)
+from backend.app.domain.graph import (
+    EdgeLabel,
+    GraphEdge,
+    GraphNeighborhood,
+    GraphSubGraph,
+    GraphVertex,
+    VertexLabel,
+)
+from backend.app.domain.payment import (
+    BaseDomainModel,
+    CreatePaymentRequest,
+    Payment,
+    PaymentEvent,
+    ProviderEventPayload,
+    ProviderPaymentResult,
+    ProviderRefundResult,
+    Refund,
+    SettlementRecord,
+)
+
+__all__ = [
+    "AgentRun",
+    "Approval",
+    "ApprovalDecision",
+    "AuditEvent",
+    "BaseDomainModel",
+    "Case",
+    "CaseStatus",
+    "CaseType",
+    "CreatePaymentRequest",
+    "EdgeLabel",
+    "EvidenceAsset",
+    "EvidenceClaim",
+    "EvidenceSourceType",
+    "FraudSeverity",
+    "FundsStatus",
+    "GraphEdge",
+    "GraphNeighborhood",
+    "GraphSubGraph",
+    "GraphVertex",
+    "InvestigationFinding",
+    "Merchant",
+    "ModelMetadata",
+    "Payment",
+    "PaymentEvent",
+    "PaymentStateSummary",
+    "PaymentStatus",
+    "ProviderEventPayload",
+    "ProviderPaymentResult",
+    "ProviderRefundResult",
+    "RecommendedNextStep",
+    "Refund",
+    "RefundStatus",
+    "SettlementRecord",
+    "SettlementStatus",
+    "StructuredInvestigationResult",
+    "Tenant",
+    "User",
+    "UserRole",
+    "VerificationState",
+    "VertexLabel",
+]

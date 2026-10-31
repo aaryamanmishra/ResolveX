@@ -1,0 +1,15 @@
+flowchart TD
+  A[Case trigger] --> B[Load tenant policy + trusted skill]
+  B --> C[Validate request and permissions]
+  C --> D[Fetch canonical payment/provider facts]
+  D --> E[Fetch graph neighbourhood]
+  E --> F[Retrieve policy + similar-case evidence]
+  F --> G[LLM evidence synthesis]
+  G --> H[Pydantic schema + evidence-reference validation]
+  H --> I{Uncertainty or missing evidence?}
+  I -- Yes --> J[Request evidence / analyst input]
+  J --> D
+  I -- No --> K[Deterministic policy engine]
+  K --> L[Draft recommendation]
+  L --> M[Human review / approval]
+  M --> N[Record decision + audit]

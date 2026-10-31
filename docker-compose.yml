@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: resolvex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: resolvex
+      POSTGRES_PASSWORD: resolvex
+      POSTGRES_DB: resolvex_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resolvex -d resolvex_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: resolvex-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    container_name: resolvex-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEMO_MODE=true
+      - DATABASE_URL=postgresql://resolvex:resolvex@postgres:5432/resolvex_db
+      - VALKEY_URL=redis://valkey:6379/0
+      - PAYMENT_PROVIDER=simulator
+      - MODEL_PROVIDER=stub
+      - GRAPH_ENGINE=memory
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

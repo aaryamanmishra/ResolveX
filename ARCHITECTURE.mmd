@@ -1,0 +1,33 @@
+flowchart TB
+  U[Customer / Merchant / Analyst] --> FE[React + TypeScript UI]
+  FE --> API[FastAPI on DigitalOcean App Platform]
+  API --> AUTH[Auth + RBAC + Tenant Guard]
+  API --> PAY[Payment Provider Adapters]
+  PAY --> PSP[Razorpay Test / Simulator / Future Authorized PSP]
+  PSP --> WH[Signed Webhooks]
+  WH --> EVT[Event Validator + Idempotency]
+  EVT --> PG[(PostgreSQL: payments, events, cases, audit)]
+  EVT --> Q[Valkey Queue]
+  Q --> WORK[Background Workers]
+  WORK --> REC[Reconciliation + Rule Engine]
+  REC --> PG
+  REC --> GRAPH[GraphStore Adapter]
+  GRAPH --> AGE[(Apache AGE)]
+  GRAPH -. optional adapter .-> TG[TigerGraph]
+  API --> AGENT[LangGraph Agent Harness]
+  AGENT --> SKILLS[Runtime Skill Registry]
+  AGENT --> MCP[MCP Tool Server]
+  MCP --> PG
+  MCP --> GRAPH
+  MCP --> RAG[Policy + Case Retrieval]
+  RAG --> VDB[(pgvector / retrieval index)]
+  AGENT --> GW[LiteLLM / Model Router]
+  GW --> GEMMA[Gemma 4 on DigitalOcean GPU]
+  AGENT --> GAPI[Gemini API Adapter]
+  API --> FILES[Evidence Service]
+  FILES --> SPACE[DigitalOcean Spaces]
+  FILES --> MM[Multimodal Extraction Pipeline]
+  MM --> GEMMA
+  MM --> GAPI
+  API --> AUD[Audit + Observability]
+  WORK --> AUD
