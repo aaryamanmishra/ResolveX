@@ -184,3 +184,21 @@ Inspect API documentation at `http://localhost:8000/docs`.
 - [x] **Deterministic Policy & Approval Routing:** Evaluates payment and fraud patterns to route recommendations. Any proposed financial modification (e.g. refund escalation) or high-severity alert triggers an approval pause (`CaseStatus.REVIEW_REQUIRED`) until supervisor review.
 - [x] **REST API Endpoints:** Added `POST /api/v1/cases/{case_id}/investigate` and `GET /api/v1/cases/{case_id}/findings`.
 - [x] **Quality gates passing:** 62/62 tests passing with Ruff format/lint and mypy static typing clean.
+
+---
+
+## Phase 5 Status & Verification Report (Multimodal Evidence Intake & Extraction)
+
+- [x] **Secure Upload & Private Storage:** `SpacesStorageProvider` (DigitalOcean Spaces / S3) and zero-dependency `MemoryStorageProvider` with short-lived presigned upload/download URLs.
+- [x] **MIME Magic Byte Verification:** Detects and verifies actual file headers (`image/png`, `image/jpeg`, `image/webp`, `application/pdf`, `audio/ogg`, `audio/mpeg`, `audio/wav`, `audio/webm`); detects and rejects extension spoofing.
+- [x] **Antivirus & Malware Scanning (`MalwareScannerService`):** Scans files for EICAR virus signatures, executable ELF/PE binary headers, and active `<script>` injections; automatically quarantines malicious payloads.
+- [x] **Multimodal Claim Extraction Pipeline (`MultimodalExtractionPipeline`):**
+  - **Receipt Images:** Extracts `amount_minor`, `utr`, and merchant metadata with confidence scores ($0.0 \dots 1.0$) and 2D bounding boxes (`box_2d: [ymin, xmin, ymax, xmax]`).
+  - **Bank Statement PDFs:** Extracts debit claims with page and line number locations.
+  - **Customer Voice Notes:** Extracts customer claims with precise audio start/end timestamps.
+- [x] **Consent Gate & Identifier Redaction:** Strict privacy gate preventing unauthorized transmission to external Gemini API without explicit tenant/customer consent; automatically redacts/masks 12-16 digit account numbers and 10-digit phone numbers before external calls.
+- [x] **Payment Truth Protection Invariant:** Extracted claims generate `EvidenceClaim` records (`verification_state = UNVERIFIED`) and cannot overwrite provider-confirmed `Payment.payment_status`.
+- [x] **User Confirmation Workflow:** Analysts or customers can confirm, correct, or reject candidate values (`POST /api/v1/evidence/{evidence_id}/confirm`), updating `VerificationState` to `USER_CONFIRMED` or `REJECTED`.
+- [x] **Tenant Boundary Protection:** All evidence assets and candidate claims fail closed against cross-tenant access.
+- [x] **REST API Endpoints:** `POST /api/v1/evidence/presign`, `POST /api/v1/evidence/upload`, `GET /api/v1/evidence/{evidence_id}`, `GET /api/v1/evidence/{evidence_id}/claims`, `POST /api/v1/evidence/{evidence_id}/confirm`.
+- [x] **Quality gates passing:** 72/72 tests passing with Ruff format/lint and mypy static typing clean.
