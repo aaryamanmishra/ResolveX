@@ -6,6 +6,8 @@ Provides API routes, health checks, OpenAPI specifications, and integration endp
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.middleware import CorrelationIdMiddleware
+from backend.app.api.v1 import api_v1_router
 from backend.app.config import settings
 from backend.app.graph.graph_store import MemoryGraphStore
 from backend.app.providers.model_provider import StubModelProvider
@@ -19,6 +21,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,6 +29,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api_v1_router)
 
 # Phase 0 default providers (Demo / Stub Mode)
 payment_provider = SimulatorPaymentProvider()

@@ -116,4 +116,17 @@ Inspect API documentation at `http://localhost:8000/docs`.
 - [x] PostgreSQL relational DDL (`001_initial_schema.sql`) and Apache AGE graph DDL (`002_apache_age_setup.sql`) created.
 - [x] Deterministic synthetic scenario seed script (`scripts/seed_synthetic_scenarios.py`) operational.
 - [x] Frontend mirrored TypeScript contracts created (`frontend/src/types/contracts.ts`).
-- [x] Quality gates passing: 23/23 tests passing with Ruff format/lint and mypy static typing clean.
+
+---
+
+## Phase 1 Status & Verification Report (Identity, Tenancy, Database & Audit)
+
+- [x] Server-side authentication and JWT token generation/verification (`POST /api/v1/auth/login`, `GET /api/v1/auth/me`).
+- [x] Server-side RBAC dependencies (`require_roles`) enforcing Customer, Support Analyst, Fraud Analyst, Supervisor, and Platform Admin access boundaries.
+- [x] Tenant context middleware and request-scoped `X-Correlation-ID` propagation.
+- [x] SQLAlchemy asynchronous models (`TenantModel`, `UserModel`, `PaymentModel`, `CaseModel`, `ApprovalModel`, `AuditEventModel`).
+- [x] Tenant-scoped database repository (`TenantScopedRepository`) enforcing database-level tenant isolation.
+- [x] Cross-tenant access tests fail closed (HTTP 403 / `SecurityError`).
+- [x] Structured audit logging (`AuditService` & `GET /api/v1/audit`) recording tamper-evident SHA-256 metadata hashes on every state mutation.
+- [x] Human approval recording (`Approval` workflow) for high-risk actions.
+- [x] Quality gates passing: 33/33 tests passing with Ruff format/lint and mypy static typing clean.
