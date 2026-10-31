@@ -152,11 +152,23 @@ async def receive_provider_webhook(
     headers = dict(request.headers)
     correlation_id = getattr(request.state, "correlation_id", None)
 
+    # Determine tenant from headers or payload if specified
+    tenant_id = headers.get("x-tenant-id") or "tenant_finops_01"
+    try:
+        import json
+
+        body_json = json.loads(raw_body.decode("utf-8"))
+        if isinstance(body_json, dict) and "tenant_id" in body_json:
+            tenant_id = body_json["tenant_id"]
+    except Exception:
+        pass
+
     try:
         result: IngestWebhookResult = payment_service.ingest_webhook(
             provider_name=provider,
             raw_body=raw_body,
             headers=headers,
+            tenant_id=tenant_id,
             correlation_id=correlation_id,
         )
         return {

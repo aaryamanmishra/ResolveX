@@ -110,7 +110,12 @@ class AuditService:
         return [
             e
             for e in reversed(self._audit_log)
-            if e.tenant_id == tenant_id and (resource_id is None or e.resource_id == resource_id)
+            if e.tenant_id == tenant_id
+            and (
+                resource_id is None
+                or e.resource_id == resource_id
+                or e.details.get("case_id") == resource_id
+            )
         ][:limit]
 
     def clear(self) -> None:

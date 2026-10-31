@@ -236,6 +236,27 @@ def get_case_findings(
         ) from err
 
 
+@router.get("/{case_id}/approvals", response_model=list[Approval])
+def list_case_approvals(
+    case_id: str,
+    ctx: TenantContext = Depends(get_current_tenant_context),
+) -> list[Approval]:
+    """List approval requests for a specific case."""
+    try:
+        case_service.get_case(ctx, case_id)
+        return case_service.list_approvals(tenant_id=ctx.tenant_id, case_id=case_id)
+    except SecurityError as sec_err:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(sec_err),
+        ) from sec_err
+    except KeyError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err
+
+
 @router.post("/{case_id}/approval", response_model=Approval, status_code=status.HTTP_201_CREATED)
 def request_approval(
     case_id: str,

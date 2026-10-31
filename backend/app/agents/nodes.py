@@ -335,6 +335,7 @@ def node_pause_for_human_approval(state: InvestigationAgentState) -> Investigati
     """Human Review Gate: Pauses execution until an authorized human signs off on sensitive action."""
     ctx = _get_context(state)
     case_id = state["case_id"]
+    track = state.get("track", "payment_issue")
 
     # Transition case to REVIEW_REQUIRED
     case_service.update_case_status(
@@ -346,6 +347,29 @@ def node_pause_for_human_approval(state: InvestigationAgentState) -> Investigati
 
     state["execution_status"] = "PAUSED_FOR_APPROVAL"
     state["step_count"] = state.get("step_count", 0) + 1
+
+    # Formulate canonical structured result so reviewer can inspect candidate findings
+    final_result = StructuredInvestigationResult(
+        case_id=case_id,
+        track=track,
+        summary=state.get(
+            "synthesis_summary",
+            "Investigation paused for human approval of proposed action.",
+        ),
+        payment_state=PaymentStateSummary.model_validate(state["payment_state"]),
+        findings=[
+            InvestigationFinding.model_validate(f) for f in state.get("validated_findings", [])
+        ],
+        unknowns=state.get("unknowns", []),
+        recommended_next_step=RecommendedNextStep.model_validate(state["proposed_action"]),
+        model_metadata=ModelMetadata(
+            provider=get_model_provider().provider_name,
+            model_id="configured-model",
+            prompt_version=f"{state.get('skill_name', 'triage')}-v1",
+            execution_time_ms=state.get("latency_ms", 50),
+        ),
+    )
+    state["structured_result"] = final_result.model_dump(mode="json")
     return state
 
 

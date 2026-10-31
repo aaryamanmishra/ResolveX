@@ -180,6 +180,18 @@ class CaseService:
         )
         return approval
 
+    def list_approvals(
+        self,
+        tenant_id: str | None = None,
+        case_id: str | None = None,
+    ) -> list[Approval]:
+        """List approvals optionally filtered by tenant or case."""
+        return [
+            a
+            for (tid, _), a in self._approvals.items()
+            if (tenant_id is None or tid == tenant_id) and (case_id is None or a.case_id == case_id)
+        ]
+
     def decide_approval(
         self,
         ctx: TenantContext,

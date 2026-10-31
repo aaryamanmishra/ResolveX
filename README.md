@@ -202,3 +202,40 @@ Inspect API documentation at `http://localhost:8000/docs`.
 - [x] **Tenant Boundary Protection:** All evidence assets and candidate claims fail closed against cross-tenant access.
 - [x] **REST API Endpoints:** `POST /api/v1/evidence/presign`, `POST /api/v1/evidence/upload`, `GET /api/v1/evidence/{evidence_id}`, `GET /api/v1/evidence/{evidence_id}/claims`, `POST /api/v1/evidence/{evidence_id}/confirm`.
 - [x] **Quality gates passing:** 72/72 tests passing with Ruff format/lint and mypy static typing clean.
+
+---
+
+## Phase 6 Status & Verification Report (Frontend & Integrated Case Workflows)
+
+- [x] **React 19 + TypeScript + Vite Frontend (`frontend/`):** Clean, high-density financial operations cockpit with dark modern UI, tabbed navigation, and zero-key local demo mode.
+- [x] **Navbar & Persona Switcher (`Navbar.tsx`):**
+  - Switch between `CUSTOMER`, `SUPPORT_ANALYST`, `FRAUD_ANALYST`, and `SUPERVISOR` roles with live RBAC token switching.
+  - Live tenant indicator (`tenant_bank_alpha`), offline zero-key demo mode pill, and 1-click demo buttons.
+- [x] **Overview Dashboard (`OverviewTab.tsx`):**
+  - Key operational metrics: Total Payments, Active Cases, Pending Human Approvals, and Reconciled Funds.
+  - Track 1 & Track 2 quick-start cards and 1-click end-to-end automated demo scenarios.
+- [x] **Track 1 Payment Operations (`PaymentsTab.tsx`):**
+  - Searchable, filterable transactions table with multi-dimensional status chips (`PaymentStatus`, `FundsStatus`, `RefundStatus`).
+  - Interactive payment simulator with scenario presets (Success, Pending, Failed, Debit Discrepancy).
+  - Out-of-order event timeline modal with provider payload hashes and raw timestamps.
+  - Customer debit claim reporting modal with bank reference / UTR intake.
+  - Unresolved reconciliation exceptions queue (detecting all 9 PRD §15.1 scenarios).
+- [x] **Track 2 Fraud Investigation Cockpit (`InvestigationsTab.tsx` & `GraphCanvas.tsx`):**
+  - Case queue filterable by status and priority severity (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
+  - 1-Click LangGraph Agent Runner executing bounded investigation steps with real-time progress indicators.
+  - Canonical Structured Findings Card conforming strictly to PRD §9.5 (synthesis summary, provider truth vs customer claims, grounded citations, explicit unknowns, and model metadata).
+  - SVG Graph Visualizer rendering tokenized entity relationships (customers, devices, cards, UPI IDs, merchants) with vertex inspector, deterministic rule indicators, and benign household filter indicator.
+  - Human Review Gate Card for sensitive actions (refund authorization, account freezes) with supervisor approval/rejection sign-off.
+- [x] **Multimodal Evidence Intake (`EvidenceTab.tsx`):**
+  - Secure upload dropzone for receipt images, statement PDFs, and voice note audio.
+  - Antivirus & malware validation badges (quarantines malicious uploads).
+  - Bounded candidate claim cards showing extracted amounts, UTRs, and 2D bounding boxes / page numbers / audio timestamps.
+  - Explicit consent toggle governing Gemini API fallback with automatic PII redaction.
+  - User confirmation workflow allowing customers or analysts to confirm or correct candidate values.
+- [x] **Tamper-Evident Audit Inspector (`AuditTab.tsx`):**
+  - Immutable audit trail table with actor IDs, action verbs, resource targets, and SHA-256 metadata hash inspector.
+- [x] **Automated End-to-End Demo Journey Tests (`test_demo_journeys.py`):**
+  - Track 1 end-to-end: payment simulation $\rightarrow$ discrepancy claim $\rightarrow$ agent triage $\rightarrow$ receipt upload $\rightarrow$ claim confirmation $\rightarrow$ supervisor approval $\rightarrow$ audit verification.
+  - Track 2 end-to-end: syndicate graph generation $\rightarrow$ deterministic rule detection $\rightarrow$ agent graph investigation $\rightarrow$ supervisor freeze sign-off $\rightarrow$ audit trail.
+  - Verified 100% operational in `DEMO_MODE=true` with zero external API keys.
+- [x] **Quality gates passing:** 74/74 tests passing, Ruff linting clean, Ruff format clean, Mypy typing clean, and Vite production bundle compiling in < 1s.

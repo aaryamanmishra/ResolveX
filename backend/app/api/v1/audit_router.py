@@ -25,3 +25,15 @@ def list_audit_events(
         resource_type=resource_type,
         limit=limit,
     )
+
+
+@router.get("/resource/{resource_id}", response_model=list[AuditEvent])
+def get_resource_audit_history(
+    resource_id: str,
+    limit: int = 50,
+    ctx: TenantContext = Depends(
+        require_roles(UserRole.SUPERVISOR, UserRole.PLATFORM_ADMIN, UserRole.FRAUD_ANALYST)
+    ),
+) -> list[AuditEvent]:
+    """Retrieve immutable audit trail for a specific resource ID within tenant boundary."""
+    return audit_service.get_history(ctx=ctx, resource_id=resource_id, limit=limit)
