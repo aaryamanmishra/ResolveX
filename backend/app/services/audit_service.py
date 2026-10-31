@@ -99,6 +99,20 @@ class AuditService:
         ]
         return results[:limit]
 
+    def get_history(
+        self,
+        ctx: Any,
+        resource_id: str | None = None,
+        limit: int = 50,
+    ) -> list[AuditEvent]:
+        """Query audit log for a specific resource within caller's tenant."""
+        tenant_id = getattr(ctx, "tenant_id", str(ctx))
+        return [
+            e
+            for e in reversed(self._audit_log)
+            if e.tenant_id == tenant_id and (resource_id is None or e.resource_id == resource_id)
+        ][:limit]
+
     def clear(self) -> None:
         """Reset logs for test fixtures."""
         self._audit_log.clear()

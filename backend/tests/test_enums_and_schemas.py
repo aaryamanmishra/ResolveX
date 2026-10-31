@@ -56,7 +56,7 @@ def test_payment_model_strict_validation() -> None:
             provider_payment_id="sim_102",
             amount_minor=5000,
             currency="INR",
-            unauthorized_field="malicious_payload",  # Extra field
+            unauthorized_field="malicious_payload",  # type: ignore[call-arg]
         )
 
 

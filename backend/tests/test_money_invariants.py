@@ -33,7 +33,7 @@ def test_amount_minor_requires_integer() -> None:
             order_ref="o2",
             provider="sim",
             provider_payment_id="p2",
-            amount_minor=15.50,  # Prohibited float
+            amount_minor=15.50,  # type: ignore[arg-type]
         )
 
 
@@ -77,5 +77,5 @@ def test_refund_amount_minor_invariants() -> None:
             id="ref_02",
             payment_id="pay_m1",
             provider_refund_id="prv_ref_2",
-            amount_minor=50.25,  # Prohibited float
+            amount_minor=50.25,  # type: ignore[arg-type]
         )

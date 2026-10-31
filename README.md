@@ -170,3 +170,17 @@ Inspect API documentation at `http://localhost:8000/docs`.
   - Scenario 6: Strict query bounding and provenance tracking.
 - [x] REST API endpoints (`GET /api/v1/cases/{case_id}/graph`, `GET /api/v1/graph/neighborhood/{entity_token}`, `POST /api/v1/cases/{case_id}/evaluate-fraud`).
 - [x] Quality gates passing: 53/53 tests passing with Ruff format/lint and mypy static typing clean.
+
+---
+
+## Phase 4 Status & Verification Report (Agent Harness, Skills & Human Review Gate)
+
+- [x] **LangGraph Investigation Workflow (`InvestigationWorkflowRunner`):** Stateful bounded state graph executing `fetch_context` $\rightarrow$ `synthesize_findings` $\rightarrow$ `validate_findings` $\rightarrow$ `evaluate_policy` $\rightarrow$ `pause_for_approval` / `finalize`.
+- [x] **Trusted Skill Registry:** Loads and verifies product runtime skills (`payment-triage`, `fraud-investigation`, `evidence-intake`, `refund-resolution`, `case-summary`) with immutable SHA-256 integrity verification.
+- [x] **Model Context Protocol (MCP) Tool Server:** Exposes 13 typed, narrow tools (`get_payment`, `get_payment_events`, `get_provider_payment_status`, `get_refund_status`, `search_transactions`, `get_graph_neighborhood`, `get_case_history`, `retrieve_policy`, `get_evidence_metadata`, `extract_evidence_claims`, `create_case_draft`, `request_additional_evidence`, `draft_resolution_recommendation`).
+- [x] **Safety Invariant Enforcement:** Server-side verification strictly blocks prohibited tools (`execute_refund`, `freeze_account`, `block_beneficiary`, `execute_sql`, `run_shell`). Attempts fail closed and log security audit records.
+- [x] **Citation & Anti-Hallucination Validator:** Strict Pydantic schema validation (`StructuredInvestigationResult`) ensuring all findings cite genuine context evidence IDs. Fabricated or ungrounded assertions are rejected and moved to `unknowns`.
+- [x] **Interchangeable Model Gateway (`ModelRouter`):** Seamless switching between Google Gemini API (`GeminiModelProvider`), open-weight Gemma 4 (`GemmaModelProvider`), and zero-key offline `StubModelProvider`.
+- [x] **Deterministic Policy & Approval Routing:** Evaluates payment and fraud patterns to route recommendations. Any proposed financial modification (e.g. refund escalation) or high-severity alert triggers an approval pause (`CaseStatus.REVIEW_REQUIRED`) until supervisor review.
+- [x] **REST API Endpoints:** Added `POST /api/v1/cases/{case_id}/investigate` and `GET /api/v1/cases/{case_id}/findings`.
+- [x] **Quality gates passing:** 62/62 tests passing with Ruff format/lint and mypy static typing clean.

@@ -83,6 +83,13 @@ class MemoryGraphStore:
         # Reverse adjacency index: (tenant_id, target_id) -> set of edge_ids
         self._in_edges: dict[tuple[str, str], set[str]] = {}
 
+    def clear(self) -> None:
+        """Reset in-memory graph store for testing."""
+        self._vertices.clear()
+        self._edges.clear()
+        self._out_edges.clear()
+        self._in_edges.clear()
+
     @property
     def engine_name(self) -> str:
         return "memory"
