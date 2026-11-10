@@ -273,3 +273,7 @@ Inspect API documentation at `http://localhost:8000/docs`.
   - `docs/DEPLOYMENT_GUIDE.md`: Architecture diagram, deployment runbook, disaster recovery/backups, and rollbacks.
   - `docs/EVALUATION_REPORT.md`: Comprehensive empirical evaluation benchmark, invariant adherence, and disclosed limitations.
 - [x] **Final Quality Gates Passing:** 83/83 unit, integration, security, and model evaluation tests passing cleanly; 100% type-safe and format-checked.
+
+## License
+
+No `LICENSE` file is currently included in this repository. Until a license is added, the code does not have an explicit open-source reuse license.
