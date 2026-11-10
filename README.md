@@ -81,7 +81,7 @@ The platform runs completely offline in `DEMO_MODE=true` with no external keys r
 ### Setup & Testing
 ```bash
 # 1. Clone & Enter repository
-cd resolveX
+cd ResolveX
 
 # 2. Setup Python environment and install dependencies
 uv venv .venv
